@@ -66,7 +66,7 @@ class VerifyOTPView(APIView):
         # گرفتن OTP از کش
         saved_otp = OTPService.get_otp(phone)
         if not saved_otp:
-            return Response({"detail": "OTP expired or not found"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "OTP expired or not found"}, status=status.HTTP_401_UNAUTHORIZED)
 
         if str(saved_otp) != str(code):
             return Response({"detail": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)

@@ -3,7 +3,6 @@ from rest_framework import serializers
 from payments.models import Discount as Discount
 from payments.models import Payment as Payment
 from payments.models import Price as Price
-from questionnaires.serializers import QuestionnaireDeatailSerializer as QuestionnaireDeatailSerializer
 from users.serializers import UserSerializer as UserSerializer
 
 
@@ -27,9 +26,9 @@ class DiscountSerializer(serializers.ModelSerializer):
         fields = ['percent', 'usage']
 
 
-class PeymentSerializer(serializers.ModelSerializer):
-    questionnaire = QuestionnaireDeatailSerializer()
-
-    class Meta:
-        models = Payment
-        fields = '__all__'
+# class PeymentSerializer(serializers.ModelSerializer):
+#     questionnaire = QuestionnaireDeatailSerializer()
+#
+#     class Meta:
+#         models = Payment
+#         fields = '__all__'

@@ -1,5 +1,3 @@
-from django.shortcuts import render
-
 # Create your views here.
 import json
 
@@ -12,7 +10,6 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from Taghzieh import settings
 from payments.models import Discount as Discount
 from payments.models import Payment as PaymentHistory
 from payments.models import Price as Price

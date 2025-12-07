@@ -21,7 +21,14 @@ class UserManager(BaseUserManager):
     def create_superuser(self, phone, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        return self.create_user(phone, **extra_fields)
+
+        if not password:
+            raise ValueError("Superusers must have a password")
+
+        user = self.model(phone=phone, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):

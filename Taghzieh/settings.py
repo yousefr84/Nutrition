@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'reports',
     'payments',
     'corsheaders',
-
+    'drf_spectacular',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -83,6 +83,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
 }
 
 WSGI_APPLICATION = 'Taghzieh.wsgi.application'

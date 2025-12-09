@@ -112,7 +112,7 @@ class VerifyOTPView(APIView):
             value=access_token,
             httponly=True,
             secure=secure_flag,
-            samesite="Lax",
+            samesite="None",
             max_age=ACCESS_MAX_AGE,
         )
 
@@ -121,7 +121,7 @@ class VerifyOTPView(APIView):
             value=refresh_token,
             httponly=True,
             secure=secure_flag,
-            samesite="Lax",
+            samesite="None",
             max_age=REFRESH_MAX_AGE,
         )
 
@@ -191,7 +191,7 @@ class RefreshTokenView(APIView):
                 value=new_access,
                 httponly=True,
                 secure=secure_flag,
-                samesite="Lax",
+                samesite="None",
                 max_age=ACCESS_MAX_AGE,
             )
             response.set_cookie(
@@ -199,7 +199,7 @@ class RefreshTokenView(APIView):
                 value=new_refresh_str,
                 httponly=True,
                 secure=secure_flag,
-                samesite="Lax",
+                samesite="None",
                 max_age=REFRESH_MAX_AGE,
             )
             return response

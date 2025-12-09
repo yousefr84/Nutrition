@@ -140,8 +140,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ------------------------
 # Celery
 # ------------------------
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6381/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6381/1')
 
 CELERY_TASK_IGNORE_RESULT = False  # chord نیاز دارد ❗
 CELERY_RESULT_PERSISTENT = True

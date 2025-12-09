@@ -5,8 +5,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from Taghzieh.settings import DEBUG
 from users.models import CustomUser
 from users.serializers import CompleteProfileSerializer
 from users.serializers import SendOTPSerializer
@@ -90,19 +92,40 @@ class VerifyOTPView(APIView):
         refresh_token = str(refresh)
 
         user_data = PublicUserSerializer(user).data
-
-        return Response(
+        response = Response(
             {
                 "detail": "OTP verified successfully",
                 "user": user_data,
-                "tokens": {
-                    "access": access_token,
-                    "refresh": refresh_token
-                },
                 "is_new": created
             },
             status=status.HTTP_200_OK
         )
+
+        # cookie params
+        ACCESS_MAX_AGE = 15 * 60  # 15 minutes
+        REFRESH_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
+
+        secure_flag = not DEBUG  # در محیط dev ممکنه DEBUG=True باشد؛ در prod حتما True کن
+
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=secure_flag,
+            samesite="Lax",
+            max_age=ACCESS_MAX_AGE,
+        )
+
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=secure_flag,
+            samesite="Lax",
+            max_age=REFRESH_MAX_AGE,
+        )
+
+        return response
 
 
 class CompleteProfileView(APIView):
@@ -126,3 +149,62 @@ class CompleteProfileView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+# users/views.py (اضافه کن)
+from rest_framework.permissions import AllowAny
+from django.conf import settings
+
+
+class RefreshTokenView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+        if not refresh_token:
+            return Response({"detail": "Refresh token not provided"}, status=401)
+
+        try:
+            # اعتبارسنجی و rotate کردن
+            token = RefreshToken(refresh_token)
+            user_id = token["user_id"]
+            # خارج کردن کاربر از token
+            # می‌تونیم user را با id بگیریم:
+            from users.models import CustomUser
+            try:
+                user = CustomUser.objects.get(id=user_id)
+            except CustomUser.DoesNotExist:
+                return Response({"detail": "User not found"}, status=404)
+
+            # ایجاد توکن‌های جدید (rotate)
+            new_refresh = RefreshToken.for_user(user)
+            new_access = str(new_refresh.access_token)
+            new_refresh_str = str(new_refresh)
+
+            ACCESS_MAX_AGE = 15 * 60
+            REFRESH_MAX_AGE = 7 * 24 * 60 * 60
+            secure_flag = not settings.DEBUG
+
+            response = Response({"detail": "Token refreshed"}, status=200)
+            response.set_cookie(
+                key="access_token",
+                value=new_access,
+                httponly=True,
+                secure=secure_flag,
+                samesite="Lax",
+                max_age=ACCESS_MAX_AGE,
+            )
+            response.set_cookie(
+                key="refresh_token",
+                value=new_refresh_str,
+                httponly=True,
+                secure=secure_flag,
+                samesite="Lax",
+                max_age=REFRESH_MAX_AGE,
+            )
+            return response
+
+        except TokenError:
+            return Response({"detail": "Invalid refresh token"}, status=401)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)

@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
 import reports.serializers
-from questionnaires.models import Answer as Answer
 from questionnaires.models import Option as Option
 from questionnaires.models import Question as Question
 from questionnaires.models import QuestionType as QuestionType
@@ -15,17 +14,43 @@ class OptionSerializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-    options = serializers.SerializerMethodField()
-    question_type = serializers.ChoiceField(choices=QuestionType.choices)
+    followUp = serializers.SerializerMethodField()
+    optionsKeys = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ['name', 'text', 'question_type', 'options', 'link', 'num_of_question', 'all_questions']
+        fields = [
+            "id",
+            "questionKey",
+            "type",
+            "required",
+            "optionsKeys",
+            "multipleSelect",
+            "placeholderKey",
+            "followUp"
+        ]
 
-    def get_options(self, obj):
-        if obj.question_type == QuestionType.MULTIPLE_CHOICE:
-            return OptionSerializer(obj.options.all(), many=True).data
-        return []
+    def get_questionKey(self, obj):
+        return f"questions.{obj.name}"
+
+    def get_type(self, obj):
+        return "number" if obj.question_type == QuestionType.OPEN_ENDED else "select"
+
+    def get_optionsKeys(self, obj):
+        return [f"options.{o.name}" for o in obj.options.all()]
+
+    def get_followUp(self, obj):
+        deps = obj.dependencies.all()
+        if not deps:
+            return None
+
+        return [
+            {
+                "dependsOn": f"questions.{d.depends_on.name}",
+                "optionValue": d.option.value if d.option else None
+            }
+            for d in deps
+        ]
 
 
 class AnswerCreateItemSerializer(serializers.Serializer):

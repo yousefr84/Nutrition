@@ -49,6 +49,12 @@ class Option(models.Model):
         return f"{self.name} ({self.value})"
 
 
+class QuestionDependency(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='dependencies')
+    depends_on = models.ForeignKey(Question, on_delete=models.CASCADE)
+    option = models.ForeignKey(Option, null=True, blank=True, on_delete=models.CASCADE)
+
+
 class Answer(models.Model):
     questionnaire = models.ForeignKey(Questionnaire, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(Question, on_delete=models.CASCADE)

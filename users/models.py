@@ -4,17 +4,17 @@ from django.contrib.auth.base_user import BaseUserManager
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, phone, first_name="", last_name="", **extra_fields):
+    def create_user(self, phone, password=None, **extra_fields):
         if not phone:
             raise ValueError("Phone number is required")
 
-        user = self.model(
-            phone=phone,
-            first_name=first_name,
-            last_name=last_name,
-            **extra_fields
-        )
-        user.set_unusable_password()  # چون پسورد نداریم
+        user = self.model(phone=phone, **extra_fields)
+
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+
         user.save(using=self._db)
         return user
 
@@ -23,12 +23,9 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
 
         if not password:
-            raise ValueError("Superusers must have a password")
+            raise ValueError("Superuser must have a password")
 
-        user = self.model(phone=phone, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
+        return self.create_user(phone, password, **extra_fields)
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):

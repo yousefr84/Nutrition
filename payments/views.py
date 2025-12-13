@@ -22,7 +22,6 @@ from users.models import CustomUser
 # Create your views here.
 
 class PayCheckAPIView(APIView):
-    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -49,7 +48,6 @@ class PayCheckAPIView(APIView):
 
 
 class PaymentAPIView(APIView):
-    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     sandbox = 'www'
@@ -151,7 +149,6 @@ class PaymentAPIView(APIView):
 
 
 class PaymentsView(APIView):
-    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):

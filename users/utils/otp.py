@@ -11,9 +11,9 @@ class OTPService:
         return str(random.randint(10000, 99999))
 
     @staticmethod
-    def save_otp(phone, otp, ttl=300):
+    def save_otp(phone, otp, ttl=120):
         """
-        ttl = 5 minutes
+        ttl = 2 minutes
         """
         cache.set(f"otp:{phone}", otp, ttl)
 

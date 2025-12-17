@@ -14,8 +14,13 @@ class OptionSerializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-    followUp = serializers.SerializerMethodField()
+    questionKey = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+    required = serializers.SerializerMethodField()
     optionsKeys = serializers.SerializerMethodField()
+    multipleSelect = serializers.SerializerMethodField()
+    placeholderKey = serializers.SerializerMethodField()
+    followUp = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
@@ -29,6 +34,37 @@ class QuestionSerializer(serializers.ModelSerializer):
             "placeholderKey",
             "followUp"
         ]
+
+    def get_questionKey(self, obj):
+        return f"questions.{obj.name}"
+
+    def get_type(self, obj):
+        return "number" if obj.question_type == QuestionType.OPEN_ENDED else "select"
+
+    def get_required(self, obj):
+        return True
+
+    def get_multipleSelect(self, obj):
+        return False
+
+    def get_placeholderKey(self, obj):
+        return None
+
+    def get_optionsKeys(self, obj):
+        return [f"options.{o.name}" for o in obj.options.all()]
+
+    def get_followUp(self, obj):
+        deps = obj.dependencies.all()
+        if not deps:
+            return None
+        return [
+            {
+                "dependsOn": f"questions.{d.depends_on.name}",
+                "optionValue": d.option.value if d.option else None
+            }
+            for d in deps
+        ]
+
 
     def get_questionKey(self, obj):
         return f"questions.{obj.name}"

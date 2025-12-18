@@ -1,5 +1,7 @@
 # Create your views here.
 from celery.result import AsyncResult
+from oci.cims.models import User
+
 from reports.tasks import generate_report
 from rest_framework import status
 from rest_framework.response import Response
@@ -70,8 +72,13 @@ class StartReportAPIView(APIView):
 class ReportStatusAPIView(APIView):
     def get(self, request, questionnaire_id):
         # وجود پرسشنامه برای این کاربر؟
+
         try:
-            questionnaire = Questionnaire.objects.get(id=questionnaire_id, user=request.user)
+            user = request.user
+        except User.DoesNotExist:
+            return Response({"detail": "User not found"}, status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            questionnaire = Questionnaire.objects.get(id=questionnaire_id, user=user)
         except Questionnaire.DoesNotExist:
             return Response(
                 {"detail": "Questionnaire not found"},

@@ -92,30 +92,35 @@ def run_prompt(self, prompt_id: int, questionnaire_id: int) -> Dict[str, Any]:
     except Prompt.DoesNotExist:
         return {"error": f"Prompt {prompt_id} not found", "prompt_id": prompt_id}
 
+    # try:
+    #     questionnaire = Questionnaire.objects.prefetch_related(
+    #         "answers__question", "answers__option"
+    #     ).get(id=questionnaire_id)
+    # except Questionnaire.DoesNotExist:
+    #     return {"error": f"Questionnaire {questionnaire_id} not found", "prompt_id": prompt_id}
+    #
+    # # -----------------------------
+    # # ساختن Questions + Answers
+    # # -----------------------------
+    # answers = questionnaire.answers.all()
+    #
+    # qa_lines: List[str] = []
+    # for a in answers:
+    #     q_text = a.question.text if a.question else "unknown question"
+    #
+    #     if a.option:
+    #         qa_lines.append(f"{q_text}: {a.option.text}")
+    #     else:
+    #         txt = (a.text_answer or "").strip()
+    #         if txt:
+    #             qa_lines.append(f"{q_text}: {txt}")
+
     try:
-        questionnaire = Questionnaire.objects.prefetch_related(
-            "answers__question", "answers__option"
-        ).get(id=questionnaire_id)
-    except Questionnaire.DoesNotExist:
-        return {"error": f"Questionnaire {questionnaire_id} not found", "prompt_id": prompt_id}
+        questionnaire =Questionnaire.objects.get(id=questionnaire_id)
+    except:
+        print(f"Questionnaire {questionnaire_id} not found in callback")
 
-    # -----------------------------
-    # ساختن Questions + Answers
-    # -----------------------------
-    answers = questionnaire.answers.all()
-
-    qa_lines: List[str] = []
-    for a in answers:
-        q_text = a.question.text if a.question else "unknown question"
-
-        if a.option:
-            qa_lines.append(f"{q_text}: {a.option.text}")
-        else:
-            txt = (a.text_answer or "").strip()
-            if txt:
-                qa_lines.append(f"{q_text}: {txt}")
-
-    questions_and_answers = "\n".join(qa_lines) if qa_lines else "بدون پاسخ"
+    questions_and_answers = questionnaire.question_answer
 
     # -----------------------------
     # ساختن Prompt نهایی

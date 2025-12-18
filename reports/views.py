@@ -1,6 +1,6 @@
 # Create your views here.
 from celery.result import AsyncResult
-from oci.cims.models import User
+from django.contrib.auth.models import User
 
 from reports.tasks import generate_report
 from rest_framework import status

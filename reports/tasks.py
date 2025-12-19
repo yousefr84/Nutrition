@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from questionnaires.models import Questionnaire
 from reports.models import Report, Prompt
+
 # این‌ها مثل نسخه اصلی ثابت می‌مانند و از کد قبلی‌ات می‌گیری
 
 logger = logging.getLogger(__name__)
@@ -180,6 +181,10 @@ def combine_prompt_results(self, results: List[Dict[str, Any]], report_id: int):
         report.status = "done"
         report.finish = timezone.now()
         report.save(update_fields=["result", "status", "finish"])
+
+        questionnaire = report.questionnaire
+        questionnaire.is_reported = True
+        questionnaire.save(update_fields=["is_reported"])
 
     logger.info(f"[combine_prompt_results] Report {report_id} completed")
 

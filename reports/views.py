@@ -1,6 +1,7 @@
 # Create your views here.
 from celery.result import AsyncResult
 from django.contrib.auth.models import User
+from rest_framework.permissions import IsAuthenticated
 
 from reports.tasks import generate_report
 from rest_framework import status
@@ -70,6 +71,7 @@ class StartReportAPIView(APIView):
 
 
 class ReportStatusAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, questionnaire_id):
         # وجود پرسشنامه برای این کاربر؟
 

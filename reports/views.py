@@ -12,6 +12,8 @@ from questionnaires.models import Questionnaire
 from reports.models import Report
 from reports.serializers import ReportSerializer
 
+from rest_framework.permissions import IsAuthenticated
+
 
 class StartReportAPIView(APIView):
     def post(self, request, questionnaire_id):

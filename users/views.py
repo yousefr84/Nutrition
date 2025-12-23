@@ -208,3 +208,11 @@ class RefreshTokenView(APIView):
             return Response({"detail": "Invalid refresh token"}, status=401)
         except Exception as e:
             return Response({"detail": str(e)}, status=400)
+
+
+class LogoutView(APIView):
+    def post(self, request):
+        response = Response({"detail": "Logged out"}, status=200)
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        return response

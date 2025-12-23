@@ -8,7 +8,7 @@ from questionnaires.models import Questionnaire
 
 @admin.register(Questionnaire)
 class QuestionnaireAdmin(admin.ModelAdmin):
-    list_display = ['user_id','created_at']
+    list_display = ['id','user_id','created_at']
 
 # @admin.register(Question)
 # class QuestionAdmin(admin.ModelAdmin):

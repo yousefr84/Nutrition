@@ -2,12 +2,13 @@
 # Backend image — Django + DRF + Celery
 # =============================================================================
 
-FROM python:3.12-slim
+FROM docker-mirror.liara.ir/python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_INDEX_URL=https://package-mirror.liara.ir/repository/pypi/simple \
     DJANGO_SETTINGS_MODULE=Taghzieh.settings
 
 RUN apt-get update && \

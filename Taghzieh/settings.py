@@ -13,20 +13,49 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
+
+def _env_bool(name, default=False):
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _env_list(name, default=None):
+    """Parse a comma-separated env var into a list of stripped values."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == '':
+        return default if default is not None else []
+    return [item.strip() for item in raw.split(',') if item.strip()]
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9p+gwo$3v#&!i!ny3(c!y3mo)jq)5c!a30dvl2ck$8++2##ndr'
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool('DJANGO_DEBUG', False)
 
-ALLOWED_HOSTS = ['*']
+# Never silently boot production with Django's generated development key.
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '').strip()
+if not SECRET_KEY or SECRET_KEY.startswith(('change-me', 'django-insecure')):
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-local-development-only'
+    else:
+        raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set to a strong production value')
+
+ALLOWED_HOSTS = _env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    ['localhost', '127.0.0.1'] if DEBUG else [],
+)
+if not DEBUG and (not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS):
+    raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS must contain explicit production hosts')
 AUTH_USER_MODEL = "users.CustomUser"
+ENABLE_API_DOCS = _env_bool('DJANGO_ENABLE_API_DOCS', DEBUG)
 
 # Application definition
 
@@ -38,23 +67,48 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
     'users',
     'questionnaires',
     'reports',
     'payments',
     'corsheaders',
-    'drf_spectacular',
 ]
+if ENABLE_API_DOCS:
+    INSTALLED_APPS.append('drf_spectacular')
 
+# CORS / CSRF — env-driven for production.
+# Comma-separated origins, or "*" to allow all (development only).
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True
+_cors_origins = _env_list('DJANGO_CORS_ALLOWED_ORIGINS', ['*'] if DEBUG else [])
+if '*' in _cors_origins:
+    if not DEBUG:
+        raise ImproperlyConfigured('Wildcard CORS is not allowed when DJANGO_DEBUG=False')
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = _cors_origins
 CORS_ALLOW_METHODS = ["OPTIONS", "POST", "GET", "PATCH", "PUT", "DELETE"]
 CORS_ALLOW_HEADERS = ["Accept", "Authorization", "Content-Type", "X-CSRFToken"]
-CSRF_TRUSTED_ALL_ORIGINS = True
+
+# CSRF trusted origins (scheme + host, e.g. http://example.com).
+CSRF_TRUSTED_ORIGINS = _env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [])
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = _env_bool('DJANGO_COOKIE_SECURE', not DEBUG)
+SESSION_COOKIE_SECURE = _env_bool('DJANGO_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_HTTPONLY = True
+
+SECURE_SSL_REDIRECT = _env_bool('DJANGO_SECURE_SSL_REDIRECT', not DEBUG)
+SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_SECURE_HSTS_SECONDS', '31536000' if not DEBUG else '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
+SECURE_HSTS_PRELOAD = _env_bool('DJANGO_SECURE_HSTS_PRELOAD', not DEBUG)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+X_FRAME_OPTIONS = 'DENY'
+
+# Trust the nginx reverse proxy headers
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -88,21 +142,65 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.auth.CookieJWTAuthentication",
     ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.getenv('DRF_ANON_THROTTLE_RATE', '30/hour'),
+        'user': os.getenv('DRF_USER_THROTTLE_RATE', '2000/day'),
+    },
 }
+if ENABLE_API_DOCS:
+    REST_FRAMEWORK['DEFAULT_SCHEMA_CLASS'] = 'drf_spectacular.openapi.AutoSchema'
+
+if DEBUG and not os.getenv('DJANGO_CACHE_URL'):
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'armani-nutrition-dev',
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': os.getenv('DJANGO_CACHE_URL', 'redis://redis:6379/2'),
+            'TIMEOUT': 300,
+        }
+    }
 
 WSGI_APPLICATION = 'Taghzieh.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# PostgreSQL is used by the production Compose stack. SQLite remains available
+# for local development and the test suite when POSTGRES_HOST isn't provided.
+if os.getenv('POSTGRES_HOST'):
+    postgres_password = os.getenv('POSTGRES_PASSWORD', '')
+    if not DEBUG and (
+        not postgres_password or postgres_password.startswith(('change-me', 'replace-with'))
+    ):
+        raise ImproperlyConfigured('POSTGRES_PASSWORD must be set to a strong production value')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'armani_nutrition'),
+            'USER': os.getenv('POSTGRES_USER', 'armani_nutrition'),
+            'PASSWORD': postgres_password,
+            'HOST': os.getenv('POSTGRES_HOST', 'postgres'),
+            'PORT': os.getenv('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('POSTGRES_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': True,
+        }
     }
-}
+else:
+    DB_PATH = os.getenv('DB_PATH', BASE_DIR / 'db.sqlite3')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': DB_PATH,
+            'OPTIONS': {'timeout': 20},
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -136,7 +234,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+# Where `collectstatic` gathers files; nginx serves these directly.
+STATIC_ROOT = os.getenv('STATIC_ROOT', BASE_DIR / 'staticfiles')
+
+# Media files (user uploads) — nginx serves these directly.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.getenv('MEDIA_ROOT', BASE_DIR / 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -145,8 +249,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ------------------------
 # Celery
 # ------------------------
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6381/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6381/1')
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://redis:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://redis:6379/1')
 
 CELERY_TASK_IGNORE_RESULT = False  # chord نیاز دارد ❗
 CELERY_RESULT_PERSISTENT = True
@@ -162,5 +266,64 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=40),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+# Payment gateway (Zarinpal v4)
+ZARINPAL_MERCHANT_ID = os.getenv('ZARINPAL_MERCHANT_ID', '')
+ZARINPAL_REQUEST_URL = os.getenv(
+    'ZARINPAL_REQUEST_URL',
+    'https://payment.zarinpal.com/pg/v4/payment/request.json',
+)
+ZARINPAL_VERIFY_URL = os.getenv(
+    'ZARINPAL_VERIFY_URL',
+    'https://payment.zarinpal.com/pg/v4/payment/verify.json',
+)
+ZARINPAL_STARTPAY_URL = os.getenv(
+    'ZARINPAL_STARTPAY_URL',
+    'https://payment.zarinpal.com/pg/StartPay',
+)
+ZARINPAL_CALLBACK_URL = os.getenv(
+    'ZARINPAL_CALLBACK_URL',
+    'https://api.innonet.ir/payments/payment/verify/',
+)
+ZARINPAL_TIMEOUT_SECONDS = int(os.getenv('ZARINPAL_TIMEOUT_SECONDS', '10'))
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://innonet.ir')
+
+SMS_BACKEND = os.getenv('SMS_BACKEND', 'http')
+SMS_API_URL = os.getenv('SMS_API_URL', '')
+SMS_API_KEY = os.getenv('SMS_API_KEY', '')
+SMS_TIMEOUT_SECONDS = int(os.getenv('SMS_TIMEOUT_SECONDS', '10'))
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'payments': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
 }

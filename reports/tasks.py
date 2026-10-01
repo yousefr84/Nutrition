@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Dict, List, Any
 
 from celery import shared_task, chord
@@ -48,10 +49,17 @@ def _log_delivery(self, title: str, extra: Dict[str, Any] = None):
 # ----------------------------
 
 def openAI(prompt, rule):
-    client = openai.OpenAI(api_key='sk-2331fea2a1244273b5179bb4faf8f3c6', base_url="https://api.deepseek.com")
+    api_key = os.getenv('DEEPSEEK_API_KEY', '').strip()
+    if not api_key or api_key.startswith(('sk-your-', 'change-me')):
+        raise RuntimeError('DEEPSEEK_API_KEY is not configured')
+
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url=os.getenv('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
+    )
     try:
         response = client.chat.completions.create(
-            model='deepseek-reasoner',
+            model=os.getenv('DEEPSEEK_MODEL', 'deepseek-reasoner'),
             temperature=0.3,
             messages=[
                 {"role": "system", "content": rule},

@@ -1,20 +1,23 @@
 # users/views/auth.py
 
+import secrets
+
+from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from Taghzieh.settings import DEBUG
 from users.models import CustomUser
 from users.serializers import CompleteProfileSerializer
 from users.serializers import SendOTPSerializer
 from users.serializers import VerifyOTPSerializer, PublicUserSerializer
 from users.utils.otp import OTPService
-from users.utils.sms_service import SMSService
+from users.utils.sms_service import SMSDeliveryError, SMSService
 
 
 class SendOTPView(APIView):
@@ -28,15 +31,28 @@ class SendOTPView(APIView):
 
         phone = serializer.validated_data['phone']
 
+        cooldown_key = f'otp:cooldown:{phone}'
+        if not cache.add(cooldown_key, '1', timeout=60):
+            return Response(
+                {'detail': 'Please wait before requesting another code'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         # چک کنیم کاربر وجود دارد یا نه
         user_exists = CustomUser.objects.filter(phone=phone).exists()
 
         # OTP تولید
         otp = OTPService.generate_otp()
-        OTPService.save_otp(phone, otp)
+        try:
+            SMSService.send_sms(phone, f"Your verification code is: {otp}")
+        except SMSDeliveryError as exc:
+            cache.delete(cooldown_key)
+            return Response(
+                {'detail': str(exc)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
-        # ارسال SMS
-        SMSService.send_sms(phone, f"Your verification code is: {otp}")
+        OTPService.save_otp(phone, otp)
 
         return Response(
             {
@@ -64,17 +80,26 @@ class VerifyOTPView(APIView):
         serializer.is_valid(raise_exception=True)
         phone = serializer.validated_data["phone"]
         code = serializer.validated_data["code"]
+        attempts_key = f'otp:attempts:{phone}'
+        attempts = int(cache.get(attempts_key, 0))
+        if attempts >= 5:
+            return Response(
+                {'detail': 'Too many invalid attempts'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
         # گرفتن OTP از کش
         saved_otp = OTPService.get_otp(phone)
         if not saved_otp:
             return Response({"detail": "OTP expired or not found"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if str(saved_otp) != str(code):
+        if not secrets.compare_digest(str(saved_otp), str(code)):
+            cache.set(attempts_key, attempts + 1, timeout=120)
             return Response({"detail": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST)
 
         # OTP درست است — پاکش می‌کنیم
         OTPService.clear_otp(phone)
+        cache.delete(attempts_key)
 
         # درون تراکنش کاربر را بگیریم یا بسازیم
         with transaction.atomic():
@@ -102,27 +127,25 @@ class VerifyOTPView(APIView):
         )
 
         # cookie params
-        ACCESS_MAX_AGE = 15 * 60  # 15 minutes
-        REFRESH_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
-
-        secure_flag = not DEBUG  # در محیط dev ممکنه DEBUG=True باشد؛ در prod حتما True کن
+        access_max_age = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds())
+        refresh_max_age = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
 
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=secure_flag,
-            samesite="Lax",
-            max_age=ACCESS_MAX_AGE,
+            secure=settings.SESSION_COOKIE_SECURE,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+            max_age=access_max_age,
         )
 
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=secure_flag,
-            samesite="Lax",
-            max_age=REFRESH_MAX_AGE,
+            secure=settings.SESSION_COOKIE_SECURE,
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+            max_age=refresh_max_age,
         )
 
         return response
@@ -151,11 +174,6 @@ class CompleteProfileView(APIView):
         )
 
 
-# users/views.py (اضافه کن)
-from rest_framework.permissions import AllowAny
-from django.conf import settings
-
-
 class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
@@ -181,26 +199,27 @@ class RefreshTokenView(APIView):
             new_access = str(new_refresh.access_token)
             new_refresh_str = str(new_refresh)
 
-            ACCESS_MAX_AGE = 15 * 60
-            REFRESH_MAX_AGE = 7 * 24 * 60 * 60
-            secure_flag = not settings.DEBUG
+            access_max_age = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds())
+            refresh_max_age = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+
+            token.blacklist()
 
             response = Response({"detail": "Token refreshed"}, status=200)
             response.set_cookie(
                 key="access_token",
                 value=new_access,
                 httponly=True,
-                secure=secure_flag,
-                samesite="Lax",
-                max_age=ACCESS_MAX_AGE,
+                secure=settings.SESSION_COOKIE_SECURE,
+                samesite=settings.SESSION_COOKIE_SAMESITE,
+                max_age=access_max_age,
             )
             response.set_cookie(
                 key="refresh_token",
                 value=new_refresh_str,
                 httponly=True,
-                secure=secure_flag,
-                samesite="Lax",
-                max_age=REFRESH_MAX_AGE,
+                secure=settings.SESSION_COOKIE_SECURE,
+                samesite=settings.SESSION_COOKIE_SAMESITE,
+                max_age=refresh_max_age,
             )
             return response
 
@@ -212,7 +231,19 @@ class RefreshTokenView(APIView):
 
 class LogoutView(APIView):
     def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except TokenError:
+                pass
         response = Response({"detail": "Logged out"}, status=200)
-        response.delete_cookie("access_token")
-        response.delete_cookie("refresh_token")
+        response.delete_cookie(
+            "access_token",
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
+        response.delete_cookie(
+            "refresh_token",
+            samesite=settings.SESSION_COOKIE_SAMESITE,
+        )
         return response

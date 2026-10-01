@@ -1,0 +1,37 @@
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.installed.cfg
+
+# Local database & logs — must NOT be baked into the image (persisted via volumes)
+db.sqlite3
+db.sqlite3-journal
+celery.log
+*.log
+
+# Redis dump
+dump.rdb
+
+# Editors / OS / VCS
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Django local artifacts
+staticfiles/
+media/
+*.sqlite3

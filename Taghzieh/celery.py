@@ -24,13 +24,13 @@ app.conf.update(
     result_serializer='json',
 )
 
-# لاگینگ ساده
+# لاگینگ ساده — logs go to stdout so they're captured by Docker
 app.conf.task_log_format = '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s'
 app.conf.worker_log_format = '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    filename='celery.log',  # اختیاری: اگر نمی‌خواهی فایل ساخته بشه، این خط رو بردار
+    # NOTE: logging to stdout (not a file) so Docker captures logs.
 )
 
 # کشف اتوماتیک تسک‌ها

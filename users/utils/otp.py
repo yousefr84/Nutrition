@@ -1,6 +1,6 @@
 # users/utils/otp.py
 
-import random
+import secrets
 from django.core.cache import cache
 
 
@@ -8,8 +8,7 @@ class OTPService:
 
     @staticmethod
     def generate_otp():
-        # return str(random.randint(10000, 99999))
-        return "12345"
+        return f'{secrets.randbelow(100_000):05d}'
 
     @staticmethod
     def save_otp(phone, otp, ttl=120):

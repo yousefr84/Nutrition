@@ -41,16 +41,18 @@ class SendOTPView(APIView):
         # چک کنیم کاربر وجود دارد یا نه
         user_exists = CustomUser.objects.filter(phone=phone).exists()
 
-        # OTP تولید
-        otp = OTPService.generate_otp()
-        try:
-            SMSService.send_sms(phone, f"Your verification code is: {otp}")
-        except SMSDeliveryError as exc:
-            cache.delete(cooldown_key)
-            return Response(
-                {'detail': str(exc)},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
+        if settings.TEST_OTP_ENABLED:
+            otp = settings.TEST_OTP_CODE
+        else:
+            otp = OTPService.generate_otp()
+            try:
+                SMSService.send_sms(phone, f"Your verification code is: {otp}")
+            except SMSDeliveryError as exc:
+                cache.delete(cooldown_key)
+                return Response(
+                    {'detail': str(exc)},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
         OTPService.save_otp(phone, otp)
 

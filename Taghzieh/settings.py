@@ -290,6 +290,10 @@ ZARINPAL_CALLBACK_URL = os.getenv(
 ZARINPAL_TIMEOUT_SECONDS = int(os.getenv('ZARINPAL_TIMEOUT_SECONDS', '10'))
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://innonet.ir')
 
+# Enabled for the current test deployment; disable to use real SMS delivery.
+TEST_OTP_ENABLED = _env_bool('TEST_OTP_ENABLED', True)
+TEST_OTP_CODE = '12345'
+
 SMS_BACKEND = os.getenv('SMS_BACKEND', 'http')
 SMS_API_URL = os.getenv('SMS_API_URL', '')
 SMS_API_KEY = os.getenv('SMS_API_KEY', '')

@@ -36,11 +36,15 @@ def _discounted_amount(price: int, discount: Discount | None) -> int:
     return max(price - (price * percent // 100), 0)
 
 
-def _frontend_redirect(page: str, **query) -> HttpResponseRedirect:
+def _frontend_url(page: str, **query) -> str:
     url = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/main/{page}"
     if query:
         url = f'{url}?{urlencode(query)}'
-    return HttpResponseRedirect(url)
+    return url
+
+
+def _frontend_redirect(page: str, **query) -> HttpResponseRedirect:
+    return HttpResponseRedirect(_frontend_url(page, **query))
 
 
 class PayCheckAPIView(APIView):
@@ -168,7 +172,10 @@ class PaymentRequestAPIView(APIView):
             return Response(
                 {
                     'status': True,
-                    'url': f"{settings.FRONTEND_BASE_URL.rstrip('/')}/result/{questionnaire.id}",
+                    'url': _frontend_url(
+                        'SuccessfulPayPage',
+                        questionnaire_id=questionnaire.id,
+                    ),
                     'authority': None,
                     'payment_id': payment.id,
                     'amount': 0,

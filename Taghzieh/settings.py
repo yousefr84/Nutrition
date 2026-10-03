@@ -285,10 +285,10 @@ ZARINPAL_STARTPAY_URL = os.getenv(
 )
 ZARINPAL_CALLBACK_URL = os.getenv(
     'ZARINPAL_CALLBACK_URL',
-    'https://api.innonet.ir/payments/payment/verify/',
+    'https://nutrition.innonet.ir/api/payments/payment/verify/',
 )
 ZARINPAL_TIMEOUT_SECONDS = int(os.getenv('ZARINPAL_TIMEOUT_SECONDS', '10'))
-FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://innonet.ir')
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://nutrition.innonet.ir')
 
 # Enabled for the current test deployment; disable to use real SMS delivery.
 TEST_OTP_ENABLED = _env_bool('TEST_OTP_ENABLED', True)
